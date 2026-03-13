@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { 
   Plus, Folder, ChevronRight, ChevronDown, Type, 
   Pencil, MousePointer2, Trash2, ChevronLeft, Layout,
-  ZoomIn, ZoomOut, Eraser, FileDown
+  ZoomIn, ZoomOut, Eraser
 } from 'lucide-react';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -24,12 +24,16 @@ export default function EduCanvas() {
   const [zoom, setZoom] = useState(1);
   const [drawingColor, setDrawingColor] = useState('#2563eb');
   const [isDrawing, setIsDrawing] = useState(false);
+  
+  // Состояния для панорамирования (движения по холсту)
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [startPanPos, setStartPanPos] = useState({ x: 0, y: 0 });
+
   const canvasRef = useRef(null);
 
-  // Инициализация данных
   useEffect(() => { if (supabase) fetchInitialData(); }, []);
 
-  // Синхронизация холста при смене доски
   useEffect(() => {
     if (activeBoard && canvasRef.current) {
       const canvas = canvasRef.current;
@@ -39,6 +43,10 @@ export default function EduCanvas() {
         const img = new Image();
         img.onload = () => ctx.drawImage(img, 0, 0);
         img.src = activeBoard.drawing_data;
+      }
+      // Загружаем сохраненную позицию камеры
+      if (activeBoard.pan_x !== undefined) {
+        setPanOffset({ x: activeBoard.pan_x || 0, y: activeBoard.pan_y || 0 });
       }
     }
   }, [activeBoard]);
@@ -64,12 +72,13 @@ export default function EduCanvas() {
         setFolders(folders.map(f => f.id === folderId ? { ...f, boards: [...f.boards, data[0]] } : f));
         setActiveBoard(data[0]);
         setElements([]);
+        setPanOffset({ x: 0, y: 0 });
       }
     }
   };
 
-  const addText = () => setElements([...elements, { id: Date.now(), type: 'text', x: 400, y: 300, width: 500, content: '' }]);
-  const addFrame = () => setElements([...elements, { id: Date.now(), type: 'frame', x: 100, y: 100, width: 1200, height: 800, content: 'Область урока' }]);
+  const addText = () => setElements([...elements, { id: Date.now(), type: 'text', x: (400 - panOffset.x)/zoom, y: (300 - panOffset.y)/zoom, width: 500, content: '' }]);
+  const addFrame = () => setElements([...elements, { id: Date.now(), type: 'frame', x: (100 - panOffset.x)/zoom, y: (100 - panOffset.y)/zoom, width: 1200, height: 800, content: 'Область урока' }]);
   
   const clearDrawings = () => {
     const canvas = canvasRef.current;
@@ -78,7 +87,6 @@ export default function EduCanvas() {
     saveToDatabase();
   };
 
-  // Логика рисования
   const startDrawing = (e) => {
     if (tool !== 'pencil') return;
     setIsDrawing(true);
@@ -102,12 +110,24 @@ export default function EduCanvas() {
   };
 
   const handleMouseDown = (e, el) => {
-    if (tool !== 'select' || e.target.tagName === 'TEXTAREA') return;
+    // Включение панорамирования: средняя кнопка мыши ИЛИ левая кнопка на пустом месте в режиме select
+    if (e.button === 1 || (tool === 'select' && !el && e.target.classList.contains('canvas-area'))) {
+      setIsPanning(true);
+      setStartPanPos({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+      return;
+    }
+
+    if (tool !== 'select' || e.target.tagName === 'TEXTAREA' || !el) return;
     setDraggedElement(el.id);
     setOffset({ x: e.clientX / zoom - el.x, y: e.clientY / zoom - el.y });
   };
 
   const handleMouseMove = (e) => {
+    if (isPanning) {
+      setPanOffset({ x: e.clientX - startPanPos.x, y: e.clientY - startPanPos.y });
+      return;
+    }
+
     if (tool === 'pencil') { draw(e); return; }
     
     if (resizingElement) {
@@ -121,27 +141,35 @@ export default function EduCanvas() {
 
     if (draggedElement) {
       setElements(elements.map(el => el.id === draggedElement ? { 
-        ...el, x: e.clientX / zoom - offset.x, y: e.clientY / zoom - offset.y 
+        ...el, 
+        x: (e.clientX - panOffset.x) / zoom - offset.x, 
+        y: (e.clientY - panOffset.y) / zoom - offset.y 
       } : el));
     }
   };
 
   const handleMouseUp = () => {
-    if (isDrawing || draggedElement || resizingElement) saveToDatabase();
+    if (isDrawing || draggedElement || resizingElement || isPanning) saveToDatabase();
     setDraggedElement(null);
     setResizingElement(null);
     setIsDrawing(false);
+    setIsPanning(false);
   };
 
   const saveToDatabase = useCallback(async () => {
     if (!activeBoard || !supabase) return;
     const drawingData = canvasRef.current?.toDataURL();
-    await supabase.from('boards').update({ elements, drawing_data: drawingData }).eq('id', activeBoard.id);
-  }, [elements, activeBoard]);
+    await supabase.from('boards').update({ 
+      elements, 
+      drawing_data: drawingData,
+      pan_x: panOffset.x,
+      pan_y: panOffset.y 
+    }).eq('id', activeBoard.id);
+  }, [elements, activeBoard, panOffset]);
 
   return (
     <div className="app-container" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
-      <aside className="sidebar">
+      <aside className="sidebar" style={{ width: isSidebarOpen ? '280px' : '0', overflow: 'hidden' }}>
         <div className="sidebar-header"><div className="logo-box">E</div>Edu Board</div>
         <div className="sidebar-content">
           <div className="sidebar-section-title"><span>ПРОЕКТЫ</span><button onClick={addFolder} className="btn-add-icon"><Plus size={16}/></button></div>
@@ -171,7 +199,7 @@ export default function EduCanvas() {
         </header>
 
         {activeBoard && (
-          <div className="canvas-area">
+          <div className="canvas-area" onMouseDown={(e) => handleMouseDown(e, null)}>
             <div className="toolbar">
               <button onClick={() => setTool('select')} className={`tool-btn ${tool==='select'?'active':''}`}><MousePointer2 size={20}/></button>
               <button onClick={() => setTool('pencil')} className={`tool-btn ${tool==='pencil'?'active':''}`}><Pencil size={20}/></button>
@@ -185,14 +213,17 @@ export default function EduCanvas() {
               <button onClick={clearDrawings} className="tool-btn btn-clear"><Eraser size={20}/></button>
             </div>
 
-            <div className="viewport" style={{ transform: `scale(${zoom})`, transformOrigin: '0 0' }}>
-              {/* Слой элементов — выше холста в режиме select */}
+            <div className="viewport" style={{ 
+              transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`, 
+              transformOrigin: '0 0',
+              cursor: isPanning ? 'grabbing' : 'default'
+            }}>
               <div className="elements-layer" style={{ zIndex: tool === 'pencil' ? 10 : 30 }}>
                 {elements.map(el => (
                   <div 
                     key={el.id} 
                     className={el.type === 'frame' ? 'miro-frame' : 'miro-text-block'}
-                    onMouseDown={(e) => handleMouseDown(e, el)}
+                    onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, el); }}
                     style={{ left: el.x, top: el.y, width: el.width, height: el.type === 'frame' ? el.height : 'auto', position: 'absolute' }}
                   >
                     <div className="miro-controls">
@@ -222,7 +253,6 @@ export default function EduCanvas() {
                 ))}
               </div>
 
-              {/* Холст — выше всего ТОЛЬКО в режиме рисования */}
               <canvas 
                 ref={canvasRef} 
                 width={5000} height={5000} 
