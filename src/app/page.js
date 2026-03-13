@@ -28,6 +28,7 @@ export default function EduCanvas() {
 
   useEffect(() => { if (supabase) fetchInitialData(); }, []);
 
+  // Синхронизация холста при смене доски
   useEffect(() => {
     if (activeBoard && canvasRef.current) {
       const canvas = canvasRef.current;
@@ -66,10 +67,9 @@ export default function EduCanvas() {
     }
   };
 
-  const addText = () => setElements([...elements, { id: Date.now(), type: 'text', x: 250, y: 200, width: 250, content: 'Введите текст...' }]);
-  const addFrame = () => setElements([...elements, { id: Date.now(), type: 'frame', x: 150, y: 150, width: 800, height: 500, content: 'Область урока' }]);
+  const addText = () => setElements([...elements, { id: Date.now(), type: 'text', x: 300, y: 300, width: 400, content: '' }]);
+  const addFrame = () => setElements([...elements, { id: Date.now(), type: 'frame', x: 100, y: 100, width: 1000, height: 700, content: 'Учебный материал' }]);
   
-  // Ластик теперь стирает ТОЛЬКО рисунки
   const clearDrawings = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -87,6 +87,18 @@ export default function EduCanvas() {
     ctx.moveTo((e.clientX - rect.left) / zoom, (e.clientY - rect.top) / zoom);
   };
 
+  const draw = (e) => {
+    if (!isDrawing || tool !== 'pencil') return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.getBoundingClientRect();
+    ctx.lineTo((e.clientX - rect.left) / zoom, (e.clientY - rect.top) / zoom);
+    ctx.strokeStyle = drawingColor;
+    ctx.lineWidth = 3 / zoom;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+  };
+
   const handleMouseDown = (e, el) => {
     if (tool !== 'select' || e.target.tagName === 'TEXTAREA') return;
     setDraggedElement(el.id);
@@ -99,27 +111,18 @@ export default function EduCanvas() {
   };
 
   const handleMouseMove = (e) => {
-    if (tool === 'pencil' && isDrawing) {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      const rect = canvas.getBoundingClientRect();
-      ctx.lineTo((e.clientX - rect.left) / zoom, (e.clientY - rect.top) / zoom);
-      ctx.strokeStyle = drawingColor;
-      ctx.lineWidth = 3 / zoom;
-      ctx.lineCap = 'round';
-      ctx.stroke();
+    if (tool === 'pencil') {
+      draw(e);
       return;
     }
-
     if (resizingElement) {
       setElements(elements.map(el => el.id === resizingElement ? { 
         ...el, 
-        width: Math.max(50, e.clientX / zoom - el.x), 
-        height: el.type === 'frame' ? Math.max(50, e.clientY / zoom - el.y) : el.height 
+        width: Math.max(100, e.clientX / zoom - el.x), 
+        height: el.type === 'frame' ? Math.max(100, e.clientY / zoom - el.y) : el.height 
       } : el));
       return;
     }
-
     if (draggedElement && tool === 'select') {
       setElements(elements.map(el => el.id === draggedElement ? { ...el, x: e.clientX / zoom - offset.x, y: e.clientY / zoom - offset.y } : el));
     }
@@ -139,19 +142,13 @@ export default function EduCanvas() {
   }, [elements, activeBoard]);
 
   return (
-    <div className="app-container" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+    <div className="app-container" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
       
       {isSidebarOpen && (
         <aside className="sidebar">
-          <div className="sidebar-header">
-             <div className="logo-box">E</div>
-             Edu Board
-          </div>
+          <div className="sidebar-header"><div className="logo-box">E</div>Edu Board</div>
           <div className="sidebar-content">
-            <div className="sidebar-section-title">
-              <span>ПРОЕКТЫ</span>
-              <button onClick={addFolder} className="btn-add-icon"><Plus size={16}/></button>
-            </div>
+            <div className="sidebar-section-title"><span>ПРОЕКТЫ</span><button onClick={addFolder} className="btn-add-icon"><Plus size={16}/></button></div>
             {folders.map(f => (
               <div key={f.id} className="folder-group">
                 <div className="folder-item" onClick={() => setExpandedFolders({...expandedFolders, [f.id]: !expandedFolders[f.id]})}>
@@ -186,25 +183,37 @@ export default function EduCanvas() {
               <button onClick={() => setTool('pencil')} className={`tool-btn ${tool==='pencil'?'active':''}`}><Pencil size={20}/></button>
               <button onClick={addText} className="tool-btn"><Type size={20}/></button>
               <button onClick={addFrame} className="tool-btn"><Layout size={20}/></button>
-              
               <div className="color-picker">
                 {['#2563eb', '#ef4444', '#10b981', '#f59e0b', '#000000', '#8b5cf6', '#ec4899', '#64748b'].map(color => (
                   <div key={color} className={`color-dot ${drawingColor === color ? 'active' : ''}`} style={{ background: color }} onClick={() => setDrawingColor(color)} />
                 ))}
               </div>
-              
               <button onClick={clearDrawings} className="tool-btn btn-clear"><Eraser size={20}/></button>
-              <button className="tool-btn" title="Скачать PDF (Скоро)"><FileDown size={20}/></button>
+              <button className="tool-btn" title="PDF Export Coming Soon"><FileDown size={20}/></button>
             </div>
 
             <div style={{ transform: `scale(${zoom})`, transformOrigin: '0 0', width: '5000px', height: '5000px', position: 'absolute' }}>
+              {/* РИСОВАНИЕ НА НИЖНЕМ СЛОЕ */}
+              <canvas 
+                ref={canvasRef} 
+                className={`drawing-canvas ${tool === 'pencil' ? 'active' : ''}`} 
+                width={5000} height={5000} 
+                onMouseDown={startDrawing}
+                style={{ position: 'absolute', top: 0, left: 0, zIndex: 5, pointerEvents: tool === 'pencil' ? 'all' : 'none' }} 
+              />
+
+              {/* ЭЛЕМЕНТЫ ПОВЕРХ */}
               {elements.map(el => (
                 <div 
                   key={el.id} 
-                  id={el.type === 'frame' ? 'lesson-area' : ''}
                   onMouseDown={(e) => handleMouseDown(e, el)} 
                   className={el.type === 'frame' ? 'frame' : 'text-element'} 
-                  style={{ left: el.x, top: el.y, width: el.width, height: el.height, cursor: tool === 'select' ? 'grab' : 'default', zIndex: el.type === 'frame' ? 1 : 10 }}
+                  style={{ 
+                    left: el.x, top: el.y, width: el.width, height: el.height, 
+                    position: 'absolute',
+                    zIndex: el.type === 'frame' ? 2 : 10,
+                    pointerEvents: tool === 'pencil' ? 'none' : 'all'
+                  }}
                 >
                   <div className="element-controls">
                     {el.type === 'frame' && <span className="frame-label">{el.content}</span>}
@@ -212,26 +221,17 @@ export default function EduCanvas() {
                   </div>
 
                   {el.type === 'text' && (
-                    <div className="text-wrapper">
-                      <textarea 
-                        value={el.content} 
-                        onChange={(e) => setElements(elements.map(item => item.id === el.id ? {...item, content: e.target.value} : item))}
-                        placeholder="Введите текст..."
-                      />
-                      <div className="resizer-h" onMouseDown={(e) => startResizing(e, el.id)} />
-                    </div>
+                    <textarea 
+                      value={el.content} 
+                      onChange={(e) => setElements(elements.map(item => item.id === el.id ? {...item, content: e.target.value} : item))}
+                      placeholder="Вставьте ваш текст здесь..."
+                      style={{ height: '100%', width: '100%' }}
+                    />
                   )}
-
-                  {el.type === 'frame' && <div className="resizer" onMouseDown={(e) => startResizing(e, el.id)} />}
+                  
+                  <div className="resizer" onMouseDown={(e) => startResizing(e, el.id)} />
                 </div>
               ))}
-              <canvas 
-                ref={canvasRef} 
-                className={`drawing-canvas ${tool === 'pencil' ? 'active' : ''}`} 
-                width={5000} height={5000} 
-                onMouseDown={startDrawing}
-                style={{ position: 'absolute', top: 0, left: 0, pointerEvents: tool === 'pencil' ? 'all' : 'none' }} 
-              />
             </div>
 
             <div className="zoom-controls">
