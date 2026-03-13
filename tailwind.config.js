@@ -1,15 +1,12 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ["./src/**/*.{js,jsx}"],
+  content: [
+    "./src/app/**/*.{js,jsx}",
+    "./src/components/**/*.{js,jsx}",
+    "./src/**/*.{js,jsx}",
+  ],
   theme: {
-    extend: {
-      colors: {
-        edu: {
-          blue: "#2563eb",
-          slate: "#1e293b"
-        }
-      }
-    }
+    extend: {},
   },
   plugins: [],
 }
