@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { 
   Plus, Folder, ChevronRight, ChevronDown, Type, 
   Pencil, MousePointer2, Trash2, ChevronLeft, Layout,
-  ZoomIn, ZoomOut, Eraser, Home
+  Eraser, Home
 } from 'lucide-react';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -61,9 +61,7 @@ export default function EduCanvas() {
       if (data) {
         setFolders(folders.map(f => f.id === folderId ? { ...f, boards: [...f.boards, data[0]] } : f));
         setActiveBoard(data[0]);
-        setElements([]);
-        setDrawings([]);
-        setPanOffset({ x: 0, y: 0 });
+        setElements([]); setDrawings([]); setPanOffset({ x: 0, y: 0 });
       }
     }
   };
@@ -71,56 +69,45 @@ export default function EduCanvas() {
   const saveToDatabase = useCallback(async (updatedElements = elements, updatedDrawings = drawings, updatedPan = panOffset) => {
     if (!activeBoard || !supabase) return;
     await supabase.from('boards').update({ 
-      elements: updatedElements, 
-      drawings: updatedDrawings,
-      pan_x: updatedPan.x,
-      pan_y: updatedPan.y 
+      elements: updatedElements, drawings: updatedDrawings,
+      pan_x: updatedPan.x, pan_y: updatedPan.y 
     }).eq('id', activeBoard.id);
   }, [activeBoard, elements, drawings, panOffset]);
 
-  // Зум колесиком
   const handleWheel = (e) => {
-    e.preventDefault();
     const delta = e.deltaY > 0 ? -0.05 : 0.05;
     setZoom(prev => Math.min(Math.max(0.1, prev + delta), 3));
+  };
+
+  const getCoords = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left - panOffset.x) / zoom,
+      y: (e.clientY - rect.top - panOffset.y) / zoom
+    };
   };
 
   const startDrawing = (e) => {
     if (tool !== 'pencil') return;
     setIsDrawing(true);
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = (e.clientX - rect.left - panOffset.x) / zoom;
-    const y = (e.clientY - rect.top - panOffset.y) / zoom;
-    setCurrentLine({ id: Date.now(), points: [{ x, y }], color: drawingColor });
+    const coords = getCoords(e);
+    setCurrentLine({ id: Date.now(), points: [coords], color: drawingColor });
   };
 
   const draw = (e) => {
     if (!isDrawing || !currentLine) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = (e.clientX - rect.left - panOffset.x) / zoom;
-    const y = (e.clientY - rect.top - panOffset.y) / zoom;
-    setCurrentLine(prev => ({ ...prev, points: [...prev.points, { x, y }] }));
+    const coords = getCoords(e);
+    setCurrentLine(prev => ({ ...prev, points: [...prev.points, coords] }));
   };
 
   const handleMouseDown = (e, el) => {
-    // Ластик для элементов
-    if (tool === 'eraser' && el) {
-      const newElements = elements.filter(item => item.id !== el.id);
-      setElements(newElements);
-      saveToDatabase(newElements);
-      return;
-    }
-
-    // Перемещение холста левой кнопкой мыши (на пустом месте)
     if (e.button === 0 && !el && (tool === 'select' || tool === 'eraser')) {
       setIsPanning(true);
       setStartPanPos({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
       return;
     }
-
     if (tool !== 'select' || e.target.tagName === 'TEXTAREA' || !el) return;
 
-    // Поднимаем элемент выше (в конец массива) и фиксируем z-index
     const newElements = [...elements.filter(item => item.id !== el.id), el];
     setElements(newElements);
     setDraggedElement(el.id);
@@ -128,15 +115,12 @@ export default function EduCanvas() {
   };
 
   const handleMouseMove = (e) => {
-    if (isPanning) {
-      setPanOffset({ x: e.clientX - startPanPos.x, y: e.clientY - startPanPos.y });
-      return;
-    }
+    if (isPanning) { setPanOffset({ x: e.clientX - startPanPos.x, y: e.clientY - startPanPos.y }); return; }
     if (isDrawing) { draw(e); return; }
     if (resizingElement) {
       setElements(elements.map(el => el.id === resizingElement ? { 
-        ...el, width: Math.max(150, e.clientX / zoom - el.x),
-        height: el.type === 'frame' ? Math.max(100, e.clientY / zoom - el.y) : el.height
+        ...el, width: Math.max(50, e.clientX / zoom - el.x),
+        height: el.type === 'frame' ? Math.max(50, e.clientY / zoom - el.y) : el.height
       } : el));
     }
     if (draggedElement) {
@@ -155,13 +139,11 @@ export default function EduCanvas() {
     } else if (draggedElement || resizingElement || isPanning) {
       saveToDatabase();
     }
-    setDraggedElement(null);
-    setResizingElement(null);
-    setIsDrawing(false);
-    setIsPanning(false);
+    setDraggedElement(null); setResizingElement(null);
+    setIsDrawing(false); setIsPanning(false);
   };
 
-  const addText = () => setElements([...elements, { id: Date.now(), type: 'text', x: (window.innerWidth/2 - panOffset.x)/zoom, y: (window.innerHeight/2 - panOffset.y)/zoom, width: 300, content: '' }]);
+  const addText = () => setElements([...elements, { id: Date.now(), type: 'text', x: (window.innerWidth/2 - panOffset.x)/zoom, y: (window.innerHeight/2 - panOffset.y)/zoom, width: 250, content: '' }]);
   const addFrame = () => setElements([...elements, { id: Date.now(), type: 'frame', x: (window.innerWidth/2 - 400 - panOffset.x)/zoom, y: (window.innerHeight/2 - 300 - panOffset.y)/zoom, width: 800, height: 600, content: 'Область урока' }]);
 
   return (
@@ -169,12 +151,12 @@ export default function EduCanvas() {
       <aside className="sidebar" style={{ width: isSidebarOpen ? '280px' : '0', overflow: 'hidden' }}>
         <div className="sidebar-header"><div className="logo-box">E</div>Edu Board</div>
         <div className="sidebar-content">
-          <div className="sidebar-section-title"><span>ПРОЕКТЫ</span><button onClick={addFolder} className="btn-add-icon"><Plus size={16}/></button></div>
+          <div className="sidebar-section-title"><span>ПРОЕКТЫ</span><button onClick={addFolder}><Plus size={16}/></button></div>
           {folders.map(f => (
             <div key={f.id} className="folder-group">
               <div className="folder-item" onClick={() => setExpandedFolders({...expandedFolders, [f.id]: !expandedFolders[f.id]})}>
                 {expandedFolders[f.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                <Folder size={16} className="icon-blue" />
+                <Folder size={16} />
                 <span className="folder-name">{f.name}</span>
                 <Plus size={14} onClick={(e) => { e.stopPropagation(); addBoard(f.id); }} />
               </div>
@@ -188,10 +170,8 @@ export default function EduCanvas() {
 
       <main className="main-content">
         <header className="header">
-          <div className="header-left">
-            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="btn-toggle"><ChevronLeft className={isSidebarOpen ? '' : 'rotate-180'} /></button>
-            <span className="board-title">{activeBoard ? activeBoard.name : 'Выберите доску'}</span>
-          </div>
+          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="btn-toggle"><ChevronLeft className={isSidebarOpen ? '' : 'rotate-180'} /></button>
+          <span className="board-title">{activeBoard ? activeBoard.name : 'Выберите доску'}</span>
         </header>
 
         {activeBoard && (
@@ -203,50 +183,44 @@ export default function EduCanvas() {
               <button onClick={addText} className="tool-btn"><Type size={20}/></button>
               <button onClick={addFrame} className="tool-btn"><Layout size={20}/></button>
               <div className="color-picker">
-                {['#2563eb', '#ef4444', '#10b981', '#000000'].map(color => (
+                {['#2563eb', '#ef4444', '#10b981', '#f59e0b', '#f472b6', '#8b5cf6', '#000000'].map(color => (
                   <div key={color} className={`color-dot ${drawingColor === color ? 'active' : ''}`} style={{ background: color }} onClick={() => setDrawingColor(color)} />
                 ))}
               </div>
             </div>
 
-            <div className="viewport" style={{ 
-              transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`, 
-              transformOrigin: '0 0',
-              cursor: isPanning ? 'grabbing' : 'default'
-            }}>
+            <div className="viewport" style={{ transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`, transformOrigin: '0 0', cursor: isPanning ? 'grabbing' : 'default' }}>
               <div className="grid-layer" />
               
-              <svg className="drawing-svg" onMouseDown={startDrawing} style={{ position: 'absolute', width: '100%', height: '100%', pointerEvents: tool === 'pencil' ? 'all' : 'none', zIndex: 60 }}>
+              <svg className="drawing-svg" onMouseDown={startDrawing} style={{ position: 'absolute', width: '5000px', height: '5000px', pointerEvents: tool === 'pencil' || tool === 'eraser' ? 'all' : 'none', zIndex: 80 }}>
                 {drawings.map(line => (
-                  <path 
-                    key={line.id} 
-                    d={`M ${line.points.map(p => `${p.x} ${p.y}`).join(' L ')}`} 
-                    fill="none" stroke={line.color} strokeWidth="3" strokeLinecap="round" 
-                    style={{ pointerEvents: tool === 'eraser' ? 'stroke' : 'none', cursor: 'pointer' }}
+                  <path key={line.id} d={`M ${line.points.map(p => `${p.x} ${p.y}`).join(' L ')}`} fill="none" stroke={line.color} strokeWidth="3" strokeLinecap="round" 
+                    style={{ pointerEvents: tool === 'eraser' ? 'stroke' : 'none' }}
                     onMouseEnter={() => tool === 'eraser' && setDrawings(prev => prev.filter(l => l.id !== line.id))}
                   />
                 ))}
-                {currentLine && (
-                  <path d={`M ${currentLine.points.map(p => `${p.x} ${p.y}`).join(' L ')}`} fill="none" stroke={currentLine.color} strokeWidth="3" strokeLinecap="round" />
-                )}
+                {currentLine && <path d={`M ${currentLine.points.map(p => `${p.x} ${p.y}`).join(' L ')}`} fill="none" stroke={currentLine.color} strokeWidth="3" strokeLinecap="round" />}
               </svg>
 
               <div className="elements-layer">
                 {elements.map(el => (
-                  <div key={el.id} 
-                    className={`${el.type === 'frame' ? 'miro-frame' : 'miro-text-block'} ${tool === 'eraser' ? 'erasable' : ''}`}
-                    onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, el); }}
-                    style={{ 
-                      left: el.x, top: el.y, width: el.width, height: el.type === 'frame' ? el.height : 'auto', 
-                      position: 'absolute', zIndex: el.type === 'text' ? 100 : 50 
-                    }}
+                  <div key={el.id} onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, el); }}
+                    className={el.type === 'frame' ? 'miro-frame' : 'miro-text-block'}
+                    style={{ left: el.x, top: el.y, width: el.width, height: el.type === 'frame' ? el.height : 'auto', position: 'absolute', zIndex: el.type === 'text' ? 100 : 50 }}
                   >
+                    <div className="element-controls">
+                      <button onClick={() => { setElements(elements.filter(i => i.id !== el.id)); saveToDatabase(elements.filter(i => i.id !== el.id)); }} className="del-btn"><Trash2 size={12}/></button>
+                    </div>
+
                     {el.type === 'text' ? (
                       <textarea className="miro-input" value={el.content} placeholder="Текст..." 
-                        onChange={(e) => setElements(elements.map(item => item.id === el.id ? {...item, content: e.target.value} : item))}
+                        onChange={(e) => {
+                          setElements(elements.map(item => item.id === el.id ? {...item, content: e.target.value} : item));
+                          e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px';
+                        }}
                       />
                     ) : <div className="miro-frame-header">{el.content}</div>}
-                    {tool === 'select' && <div className="miro-resizer" onMouseDown={(e) => { e.stopPropagation(); setResizingElement(el.id); }} />}
+                    <div className="miro-resizer" onMouseDown={(e) => { e.stopPropagation(); setResizingElement(el.id); }} />
                   </div>
                 ))}
               </div>
