@@ -7,17 +7,18 @@ body { margin: 0; font-family: 'Inter', sans-serif; background: #f8fafc; overflo
 .sidebar-content { padding: 20px; overflow-y: auto; }
 .sidebar-section-title { display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; font-weight: 900; margin-bottom: 15px; }
 
-.folder-item { display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+.folder-item { display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 14px; position: relative; }
+.folder-name { flex: 1; }
 .board-item { margin-left: 28px; padding: 8px 12px; font-size: 13px; border-radius: 8px; cursor: pointer; color: #64748b; transition: 0.2s; }
 .board-item:hover { background: #f1f5f9; }
 .board-item.active { background: #2563eb; color: white; }
 
 .main-content { flex: 1; display: flex; flex-direction: column; position: relative; }
-.header { height: 60px; background: white; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; padding: 0 24px; z-index: 50; }
-.header-left { display: flex; align-items: center; gap: 15px; }
+.header { height: 60px; background: white; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; padding: 0 24px; z-index: 50; gap: 15px; }
+.btn-toggle { background: transparent; border: none; cursor: pointer; color: #64748b; }
 
 .canvas-area { flex: 1; position: relative; overflow: hidden; background: #f8fafc; }
-.viewport { position: absolute; width: 10000px; height: 10000px; }
+.viewport { position: absolute; width: 5000px; height: 5000px; }
 
 .grid-layer {
     position: absolute; inset: 0;
@@ -30,22 +31,31 @@ body { margin: 0; font-family: 'Inter', sans-serif; background: #f8fafc; overflo
 .tool-btn { width: 38px; height: 38px; border-radius: 8px; border: none; background: transparent; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .tool-btn.active { background: #2563eb; color: white; }
 
-.color-picker { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; align-items: center; }
-.color-dot { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
-.color-dot.active { border-color: #94a3b8; }
+.color-picker { display: flex; flex-direction: column; gap: 8px; padding: 8px 0; align-items: center; border-top: 1px solid #f1f5f9; margin-top: 4px; }
+.color-dot { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid white; box-shadow: 0 0 0 1px #e2e8f0; }
+.color-dot.active { box-shadow: 0 0 0 2px #2563eb; }
 
-.miro-text-block { background: white; padding: 10px; min-width: 150px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-.miro-text-block:hover { box-shadow: 0 0 0 2px #2563eb; }
-.miro-frame { border: 2px solid #cbd5e1; border-radius: 12px; background: rgba(255,255,255,0.4); }
-.miro-frame-header { position: absolute; top: -30px; left: 0; font-size: 12px; font-weight: 800; color: #94a3b8; background: #f1f5f9; padding: 4px 12px; border-radius: 6px; }
-
-.erasable:hover { cursor: url('https://img.icons8.com/ios-filled/20/ef4444/eraser.png'), auto !important; outline: 2px solid #ef4444; }
+/* Miro-style Elements */
+.miro-text-block { background: transparent; padding: 8px; border: 1px solid transparent; transition: 0.2s; }
+.miro-text-block:hover { border: 1px solid #2563eb; background: rgba(37, 99, 235, 0.02); }
 
 .miro-input {
-    width: 100%; min-height: 20px; background: transparent; border: none; outline: none;
-    font-size: 16px; line-height: 1.5; color: #1e293b; resize: none; overflow: hidden;
+    width: 100%; background: transparent; border: none; outline: none;
+    font-size: 16px; font-family: 'Inter', sans-serif; color: #1e293b; resize: none;
+    line-height: 1.4; padding: 0; display: block; overflow: hidden;
 }
 
-.miro-resizer { width: 10px; height: 10px; background: #2563eb; position: absolute; right: -5px; bottom: -5px; border-radius: 50%; cursor: nwse-resize; }
+.miro-frame { border: 2px solid #cbd5e1; border-radius: 8px; background: rgba(255, 255, 255, 0.3); }
+.miro-frame-header { position: absolute; top: -28px; left: 0; font-size: 11px; font-weight: 700; color: #64748b; background: #e2e8f0; padding: 2px 10px; border-radius: 4px; }
+
+/* Controls */
+.element-controls { position: absolute; top: -30px; right: 0; opacity: 0; transition: 0.2s; display: flex; gap: 4px; }
+.miro-text-block:hover .element-controls, .miro-frame:hover .element-controls { opacity: 1; }
+
+.del-btn { background: #ef4444; color: white; border: none; padding: 4px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; }
+.miro-resizer { width: 10px; height: 10px; background: #2563eb; position: absolute; right: -5px; bottom: -5px; border-radius: 50%; cursor: nwse-resize; opacity: 0; }
+.miro-text-block:hover .miro-resizer, .miro-frame:hover .miro-resizer { opacity: 1; }
+
 .zoom-controls { position: absolute; bottom: 20px; right: 20px; background: white; padding: 4px 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); z-index: 200; border: 1px solid #e2e8f0; }
 .zoom-val { font-size: 12px; font-weight: 700; color: #64748b; width: 40px; text-align: center; }
+.drawing-svg { cursor: crosshair; }
