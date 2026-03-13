@@ -227,3 +227,62 @@ body {
     background: #f1f5f9;
     border-radius: 2px;
 }
+
+/* Холст для рисования */
+.drawing-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none; /* Чтобы не мешать кликать на заметки */
+    z-index: 5;
+}
+
+.drawing-canvas.active {
+    pointer-events: all;
+    cursor: crosshair;
+}
+
+/* Палитра цветов */
+.color-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.color-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.color-dot.active {
+    border-color: #2563eb;
+    transform: scale(1.1);
+}
+
+/* Фреймы (как в Miro) */
+.frame {
+    position: absolute;
+    border: 2px solid #cbd5e1;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.5);
+    z-index: 1;
+}
+
+.frame-label {
+    position: absolute;
+    top: -25px;
+    left: 0;
+    font-size: 12px;
+    font-weight: bold;
+    color: #64748b;
+    background: #f1f5f9;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
