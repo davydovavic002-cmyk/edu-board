@@ -26,8 +26,10 @@ export default function EduCanvas() {
   const [isDrawing, setIsDrawing] = useState(false);
   const canvasRef = useRef(null);
 
+  // Инициализация данных
   useEffect(() => { if (supabase) fetchInitialData(); }, []);
 
+  // Синхронизация холста при смене доски
   useEffect(() => {
     if (activeBoard && canvasRef.current) {
       const canvas = canvasRef.current;
@@ -66,18 +68,7 @@ export default function EduCanvas() {
     }
   };
 
-  // Создаем текстовый блок с автоматической высотой
-  const addText = () => {
-    const newText = { 
-      id: Date.now(), 
-      type: 'text', 
-      x: 400, y: 300, 
-      width: 500, 
-      content: '' 
-    };
-    setElements([...elements, newText]);
-  };
-
+  const addText = () => setElements([...elements, { id: Date.now(), type: 'text', x: 400, y: 300, width: 500, content: '' }]);
   const addFrame = () => setElements([...elements, { id: Date.now(), type: 'frame', x: 100, y: 100, width: 1200, height: 800, content: 'Область урока' }]);
   
   const clearDrawings = () => {
@@ -87,6 +78,7 @@ export default function EduCanvas() {
     saveToDatabase();
   };
 
+  // Логика рисования
   const startDrawing = (e) => {
     if (tool !== 'pencil') return;
     setIsDrawing(true);
@@ -110,7 +102,7 @@ export default function EduCanvas() {
   };
 
   const handleMouseDown = (e, el) => {
-    if (tool !== 'select' || e.target.classList.contains('miro-input')) return;
+    if (tool !== 'select' || e.target.tagName === 'TEXTAREA') return;
     setDraggedElement(el.id);
     setOffset({ x: e.clientX / zoom - el.x, y: e.clientY / zoom - el.y });
   };
@@ -194,45 +186,34 @@ export default function EduCanvas() {
             </div>
 
             <div className="viewport" style={{ transform: `scale(${zoom})`, transformOrigin: '0 0' }}>
-              {/* Слой рисования ВСЕГДА сверху, но пропускает клики в режиме селекта */}
-              <canvas 
-                ref={canvasRef} 
-                width={5000} height={5000} 
-                onMouseDown={startDrawing}
-                className="drawing-layer"
-                style={{ pointerEvents: tool === 'pencil' ? 'all' : 'none' }}
-              />
-
-              {/* Слой элементов */}
-              <div className="elements-layer">
+              {/* Слой элементов — выше холста в режиме select */}
+              <div className="elements-layer" style={{ zIndex: tool === 'pencil' ? 10 : 30 }}>
                 {elements.map(el => (
                   <div 
                     key={el.id} 
                     className={el.type === 'frame' ? 'miro-frame' : 'miro-text-block'}
                     onMouseDown={(e) => handleMouseDown(e, el)}
-                    style={{ left: el.x, top: el.y, width: el.width, height: el.height }}
+                    style={{ left: el.x, top: el.y, width: el.width, height: el.type === 'frame' ? el.height : 'auto', position: 'absolute' }}
                   >
                     <div className="miro-controls">
                       <button onClick={() => setElements(elements.filter(i => i.id !== el.id))} className="miro-del"><Trash2 size={12}/></button>
                     </div>
 
                     {el.type === 'text' ? (
-                      <div className="miro-input-container">
-                        <textarea 
-                          className="miro-input"
-                          value={el.content}
-                          placeholder="Вставьте текст..."
-                          onChange={(e) => {
-                            setElements(elements.map(item => item.id === el.id ? {...item, content: e.target.value} : item));
-                            e.target.style.height = 'auto';
-                            e.target.style.height = e.target.scrollHeight + 'px';
-                          }}
-                          onFocus={(e) => {
-                            e.target.style.height = 'auto';
-                            e.target.style.height = e.target.scrollHeight + 'px';
-                          }}
-                        />
-                      </div>
+                      <textarea 
+                        className="miro-input"
+                        value={el.content}
+                        placeholder="Вставьте текст..."
+                        onChange={(e) => {
+                          setElements(elements.map(item => item.id === el.id ? {...item, content: e.target.value} : item));
+                          e.target.style.height = 'auto';
+                          e.target.style.height = e.target.scrollHeight + 'px';
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.height = 'auto';
+                          e.target.style.height = e.target.scrollHeight + 'px';
+                        }}
+                      />
                     ) : (
                       <div className="miro-frame-header">{el.content}</div>
                     )}
@@ -240,6 +221,20 @@ export default function EduCanvas() {
                   </div>
                 ))}
               </div>
+
+              {/* Холст — выше всего ТОЛЬКО в режиме рисования */}
+              <canvas 
+                ref={canvasRef} 
+                width={5000} height={5000} 
+                onMouseDown={startDrawing}
+                className="drawing-layer"
+                style={{ 
+                  position: 'absolute', top: 0, left: 0, 
+                  zIndex: tool === 'pencil' ? 40 : 5, 
+                  pointerEvents: tool === 'pencil' ? 'all' : 'none',
+                  cursor: tool === 'pencil' ? 'crosshair' : 'default'
+                }}
+              />
             </div>
 
             <div className="zoom-controls">
