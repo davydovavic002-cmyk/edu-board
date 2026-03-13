@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { 
   Plus, Folder, ChevronRight, ChevronDown, Type, 
   Pencil, MousePointer2, Trash2, ChevronLeft, Layout,
-  ZoomIn, ZoomOut, Eraser
+  ZoomIn, ZoomOut, Eraser, FileDown
 } from 'lucide-react';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -28,7 +28,6 @@ export default function EduCanvas() {
 
   useEffect(() => { if (supabase) fetchInitialData(); }, []);
 
-  // Восстановление рисунка при смене доски
   useEffect(() => {
     if (activeBoard && canvasRef.current) {
       const canvas = canvasRef.current;
@@ -67,17 +66,15 @@ export default function EduCanvas() {
     }
   };
 
-  const addNote = () => setElements([...elements, { id: Date.now(), type: 'text', x: 200, y: 200, content: 'Новая заметка' }]);
-  const addFrame = () => setElements([...elements, { id: Date.now(), type: 'frame', x: 150, y: 150, width: 400, height: 300, content: 'Область урока' }]);
+  const addText = () => setElements([...elements, { id: Date.now(), type: 'text', x: 250, y: 200, width: 250, content: 'Введите текст...' }]);
+  const addFrame = () => setElements([...elements, { id: Date.now(), type: 'frame', x: 150, y: 150, width: 800, height: 500, content: 'Область урока' }]);
   
-  const clearCanvas = () => {
-    if (confirm('Очистить всю доску?')) {
-      setElements([]);
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      saveToDatabase(true);
-    }
+  // Ластик теперь стирает ТОЛЬКО рисунки
+  const clearDrawings = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    saveToDatabase();
   };
 
   const startDrawing = (e) => {
@@ -115,7 +112,11 @@ export default function EduCanvas() {
     }
 
     if (resizingElement) {
-      setElements(elements.map(el => el.id === resizingElement ? { ...el, width: Math.max(100, e.clientX / zoom - el.x), height: Math.max(100, e.clientY / zoom - el.y) } : el));
+      setElements(elements.map(el => el.id === resizingElement ? { 
+        ...el, 
+        width: Math.max(50, e.clientX / zoom - el.x), 
+        height: el.type === 'frame' ? Math.max(50, e.clientY / zoom - el.y) : el.height 
+      } : el));
       return;
     }
 
@@ -125,29 +126,17 @@ export default function EduCanvas() {
   };
 
   const handleMouseUp = () => {
-    if (isDrawing || draggedElement || resizingElement) {
-      saveToDatabase();
-    }
+    if (isDrawing || draggedElement || resizingElement) saveToDatabase();
     setDraggedElement(null);
     setResizingElement(null);
     setIsDrawing(false);
   };
 
-  const saveToDatabase = useCallback(async (isClear = false) => {
+  const saveToDatabase = useCallback(async () => {
     if (!activeBoard || !supabase) return;
-    
-    const drawingData = isClear ? null : canvasRef.current?.toDataURL();
-    
-    await supabase.from('boards').update({ 
-      elements,
-      drawing_data: drawingData 
-    }).eq('id', activeBoard.id);
+    const drawingData = canvasRef.current?.toDataURL();
+    await supabase.from('boards').update({ elements, drawing_data: drawingData }).eq('id', activeBoard.id);
   }, [elements, activeBoard]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => saveToDatabase(), 2000);
-    return () => clearTimeout(timer);
-  }, [elements, saveToDatabase]);
 
   return (
     <div className="app-container" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
@@ -195,7 +184,7 @@ export default function EduCanvas() {
             <div className="toolbar">
               <button onClick={() => setTool('select')} className={`tool-btn ${tool==='select'?'active':''}`}><MousePointer2 size={20}/></button>
               <button onClick={() => setTool('pencil')} className={`tool-btn ${tool==='pencil'?'active':''}`}><Pencil size={20}/></button>
-              <button onClick={addNote} className="tool-btn"><Type size={20}/></button>
+              <button onClick={addText} className="tool-btn"><Type size={20}/></button>
               <button onClick={addFrame} className="tool-btn"><Layout size={20}/></button>
               
               <div className="color-picker">
@@ -204,17 +193,35 @@ export default function EduCanvas() {
                 ))}
               </div>
               
-              <button onClick={clearCanvas} className="tool-btn btn-clear"><Eraser size={20}/></button>
+              <button onClick={clearDrawings} className="tool-btn btn-clear"><Eraser size={20}/></button>
+              <button className="tool-btn" title="Скачать PDF (Скоро)"><FileDown size={20}/></button>
             </div>
 
             <div style={{ transform: `scale(${zoom})`, transformOrigin: '0 0', width: '5000px', height: '5000px', position: 'absolute' }}>
               {elements.map(el => (
-                <div key={el.id} onMouseDown={(e) => handleMouseDown(e, el)} className={el.type === 'frame' ? 'frame' : 'note'} style={{ left: el.x, top: el.y, width: el.width, height: el.height, cursor: tool === 'select' ? 'grab' : 'default', zIndex: el.type === 'frame' ? 1 : 10 }}>
-                  <div className="note-header">
-                    {el.type === 'frame' ? <span className="frame-label">{el.content}</span> : <div className="note-handle" />}
-                    <button onClick={() => setElements(elements.filter(item => item.id !== el.id))} className="btn-delete"><Trash2 size={12} /></button>
+                <div 
+                  key={el.id} 
+                  id={el.type === 'frame' ? 'lesson-area' : ''}
+                  onMouseDown={(e) => handleMouseDown(e, el)} 
+                  className={el.type === 'frame' ? 'frame' : 'text-element'} 
+                  style={{ left: el.x, top: el.y, width: el.width, height: el.height, cursor: tool === 'select' ? 'grab' : 'default', zIndex: el.type === 'frame' ? 1 : 10 }}
+                >
+                  <div className="element-controls">
+                    {el.type === 'frame' && <span className="frame-label">{el.content}</span>}
+                    <button onClick={() => setElements(elements.filter(item => item.id !== el.id))} className="btn-delete-small"><Trash2 size={10} /></button>
                   </div>
-                  {el.type === 'text' && <textarea value={el.content} onChange={(e) => setElements(elements.map(item => item.id === el.id ? {...item, content: e.target.value} : item))} rows={3} />}
+
+                  {el.type === 'text' && (
+                    <div className="text-wrapper">
+                      <textarea 
+                        value={el.content} 
+                        onChange={(e) => setElements(elements.map(item => item.id === el.id ? {...item, content: e.target.value} : item))}
+                        placeholder="Введите текст..."
+                      />
+                      <div className="resizer-h" onMouseDown={(e) => startResizing(e, el.id)} />
+                    </div>
+                  )}
+
                   {el.type === 'frame' && <div className="resizer" onMouseDown={(e) => startResizing(e, el.id)} />}
                 </div>
               ))}
@@ -229,7 +236,7 @@ export default function EduCanvas() {
 
             <div className="zoom-controls">
               <button onClick={() => setZoom(prev => Math.max(0.2, prev - 0.1))} className="tool-btn"><ZoomOut size={18}/></button>
-              <span style={{ fontSize: '12px', fontWeight: 'bold', width: '40px', textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
+              <span style={{ fontSize: '11px', fontWeight: '800', width: '35px', textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
               <button onClick={() => setZoom(prev => Math.min(2, prev + 0.1))} className="tool-btn"><ZoomIn size={18}/></button>
             </div>
           </div>
