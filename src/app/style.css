@@ -4,6 +4,7 @@ body {
     font-family: 'Inter', -apple-system, sans-serif;
     background-color: #f8fafc;
     color: #1e293b;
+    overflow: hidden;
 }
 
 .app-container {
@@ -19,14 +20,33 @@ body {
     border-right: 1px solid #e2e8f0;
     display: flex;
     flex-direction: column;
+    z-index: 50;
 }
 
 .sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
     padding: 24px;
     border-bottom: 1px solid #f1f5f9;
+    font-weight: 800;
+    font-size: 18px;
+    color: #1e293b;
+    line-height: 1;
+}
+
+.logo-box {
+    width: 32px;
+    height: 32px;
+    background: #2563eb;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
     font-weight: bold;
-    font-size: 20px;
-    color: #2563eb;
+    font-style: italic;
+    font-size: 14px;
 }
 
 .sidebar-content {
@@ -35,40 +55,49 @@ body {
     overflow-y: auto;
 }
 
-/* Кнопки и элементы */
-.btn-add {
-    background: #eff6ff;
-    color: #2563eb;
-    border: none;
-    padding: 5px 10px;
-    border-radius: 6px;
-    cursor: pointer;
+.sidebar-section-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 0 8px;
+    font-size: 10px;
+    font-weight: 900;
+    color: #94a3b8;
+    letter-spacing: 0.1em;
 }
 
+/* Элементы списка в сайдбаре */
 .folder-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     padding: 10px;
     border-radius: 8px;
     cursor: pointer;
-    margin-bottom: 5px;
+    font-size: 14px;
+    font-weight: 500;
     transition: background 0.2s;
 }
 
 .folder-item:hover {
-    background: #f1f5f9;
+    background: #f8fafc;
 }
 
 .board-item {
-    margin-left: 20px;
-    padding: 8px;
-    font-size: 14px;
-    color: #64748b;
+    margin-left: 28px;
+    padding: 8px 12px;
+    font-size: 13px;
+    border-radius: 8px;
     cursor: pointer;
+    margin-top: 2px;
+    color: #64748b;
+    transition: all 0.2s;
 }
 
 .board-item.active {
     background: #2563eb;
     color: white;
-    border-radius: 6px;
 }
 
 /* Рабочая область */
@@ -77,8 +106,7 @@ body {
     display: flex;
     flex-direction: column;
     position: relative;
-    background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
-    background-size: 30px 30px;
+    background-color: #f8fafc;
 }
 
 .header {
@@ -87,47 +115,24 @@ body {
     border-bottom: 1px solid #e2e8f0;
     display: flex;
     align-items: center;
-    padding: 0 20px;
+    padding: 0 24px;
     justify-content: space-between;
+    z-index: 40;
 }
 
-/* Заметки (Стикеры) */
-.note {
-    position: absolute;
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 15px;
-    min-width: 200px;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    cursor: grab;
-}
-
-.note textarea {
-    width: 100%;
-    border: none;
-    outline: none;
-    resize: none;
-    font-size: 14px;
-    margin-top: 10px;
-}
-
-/* Тулбар */
-.toolbar {
-    position: absolute;
-    left: 20px;
-    top: 80px;
-    background: white;
-    padding: 10px;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+.header-left {
     display: flex;
-    flex-direction: column;
-    gap: 10px;
-    z-index: 100;
+    align-items: center;
+    gap: 16px;
 }
 
-/* Панель инструментов (как в Miro) */
+.board-title {
+    font-weight: 700;
+    font-size: 14px;
+    color: #1e293b;
+}
+
+/* Тулбар (Miro Style) */
 .toolbar {
     position: absolute;
     left: 24px;
@@ -139,14 +144,14 @@ body {
     box-shadow: 0 10px 25px rgba(0,0,0,0.1);
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
     z-index: 1000;
     border: 1px solid #e2e8f0;
 }
 
 .tool-btn {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -168,40 +173,33 @@ body {
     color: white;
 }
 
-.divider {
-    height: 1px;
-    background: #f1f5f9;
-    margin: 0 5px;
+.tool-btn.btn-clear {
+    margin-top: 8px;
+    border-top: 1px solid #f1f5f9;
+    padding-top: 16px;
+    color: #ef4444;
 }
 
-/* Стилизация папок и досок в сайдбаре */
-.folder-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px;
-    border-radius: 8px;
+/* Палитра */
+.color-picker {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    padding: 8px 0;
+    border-top: 1px solid #f1f5f9;
+}
+
+.color-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid transparent;
     cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
 }
 
-.folder-item:hover {
-    background: #f8fafc;
-}
-
-.board-item {
-    margin-left: 28px;
-    padding: 6px 12px;
-    font-size: 13px;
-    border-radius: 6px;
-    cursor: pointer;
-    margin-top: 2px;
-}
-
-.board-item.active {
-    background: #2563eb;
-    color: white;
+.color-dot.active {
+    border-color: #cbd5e1;
+    transform: scale(1.1);
 }
 
 /* Заметки */
@@ -210,7 +208,7 @@ body {
     background: white;
     border-radius: 12px;
     padding: 16px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
     border: 1px solid #e2e8f0;
     min-width: 200px;
 }
@@ -218,71 +216,99 @@ body {
 .note-header {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     margin-bottom: 8px;
 }
 
 .note-handle {
-    width: 30px;
+    width: 32px;
     height: 4px;
     background: #f1f5f9;
     border-radius: 2px;
 }
 
-/* Холст для рисования */
-.drawing-canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-    pointer-events: none; /* Чтобы не мешать кликать на заметки */
-    z-index: 5;
+.note textarea {
+    width: 100%;
+    border: none;
+    outline: none;
+    resize: none;
+    font-size: 14px;
+    font-family: inherit;
+    color: #334155;
+    background: transparent;
 }
 
-.drawing-canvas.active {
-    pointer-events: all;
-    cursor: crosshair;
-}
-
-/* Палитра цветов */
-.color-picker {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid #f1f5f9;
-}
-
-.color-dot {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    border: 2px solid transparent;
-    cursor: pointer;
-    transition: transform 0.2s;
-}
-
-.color-dot.active {
-    border-color: #2563eb;
-    transform: scale(1.1);
-}
-
-/* Фреймы (как в Miro) */
+/* Фреймы */
 .frame {
     position: absolute;
     border: 2px solid #cbd5e1;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.5);
-    z-index: 1;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.4);
 }
 
 .frame-label {
     position: absolute;
-    top: -25px;
+    top: -28px;
     left: 0;
     font-size: 12px;
-    font-weight: bold;
+    font-weight: 800;
     color: #64748b;
     background: #f1f5f9;
-    padding: 2px 8px;
-    border-radius: 4px;
+    padding: 4px 10px;
+    border-radius: 6px;
+}
+
+.resizer {
+    width: 16px;
+    height: 16px;
+    background: #cbd5e1;
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    cursor: nwse-resize;
+    border-radius: 4px 0 0 0;
+}
+
+/* Холст и Зум */
+.drawing-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 5;
+}
+
+.zoom-controls {
+    position: absolute;
+    bottom: 24px;
+    right: 24px;
+    background: white;
+    padding: 6px;
+    border-radius: 12px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    z-index: 1000;
+    border: 1px solid #e2e8f0;
+}
+
+.status-badge {
+    font-size: 9px;
+    background: #ecfdf5;
+    color: #059669;
+    padding: 4px 10px;
+    border-radius: 99px;
+    font-weight: 800;
+    border: 1px solid #d1fae5;
+}
+
+.empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    items-center;
+    justify-content: center;
+    color: #cbd5e1;
+    gap: 16px;
+    text-align: center;
 }
