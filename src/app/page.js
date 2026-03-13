@@ -1,12 +1,11 @@
 "use client";
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { 
   Plus, Folder, ChevronRight, ChevronDown, Type, 
   Pencil, MousePointer2, Trash2, ChevronLeft, Layout 
 } from 'lucide-react';
 
-// Инициализация через переменные окружения
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -23,6 +22,11 @@ export default function EduCanvas() {
   const [tool, setTool] = useState('select');
   const [draggedElement, setDraggedElement] = useState(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  
+  // Новые состояния для рисования и фреймов
+  const [drawingColor, setDrawingColor] = useState('#2563eb');
+  const [isDrawing, setIsDrawing] = useState(false);
+  const canvasRef = useRef(null);
 
   useEffect(() => {
     if (supabase) {
@@ -58,12 +62,44 @@ export default function EduCanvas() {
     setElements([...elements, newNote]);
   };
 
+  const addFrame = () => {
+    const newFrame = { id: Date.now(), type: 'frame', x: 100, y: 100, width: 600, height: 400, content: 'Новый фрейм' };
+    setElements([...elements, newFrame]);
+  };
+
   const updateNoteContent = (id, newContent) => {
     setElements(elements.map(el => el.id === id ? { ...el, content: newContent } : el));
   };
 
   const deleteElement = (id) => {
     setElements(elements.filter(el => el.id !== id));
+  };
+
+  // Логика рисования
+  const startDrawing = (e) => {
+    if (tool !== 'pencil') return;
+    setIsDrawing(true);
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.getBoundingClientRect();
+    ctx.beginPath();
+    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+  };
+
+  const draw = (e) => {
+    if (!isDrawing || tool !== 'pencil') return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.getBoundingClientRect();
+    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+    ctx.strokeStyle = drawingColor;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
   };
 
   const handleMouseDown = (e, el) => {
@@ -73,11 +109,19 @@ export default function EduCanvas() {
   };
 
   const handleMouseMove = (e) => {
+    if (tool === 'pencil') {
+      draw(e);
+      return;
+    }
     if (!draggedElement || tool !== 'select') return;
     setElements(elements.map(el => el.id === draggedElement ? { ...el, x: e.clientX - offset.x, y: e.clientY - offset.y } : el));
   };
 
   const handleMouseUp = () => {
+    if (tool === 'pencil') {
+      stopDrawing();
+      return;
+    }
     if (draggedElement) {
       saveToDatabase();
       setDraggedElement(null);
@@ -151,34 +195,63 @@ export default function EduCanvas() {
         </header>
 
         {activeBoard ? (
-          <div className="canvas-area">
+          <div className="canvas-area" style={{ position: 'relative', flex: 1 }}>
+            
             {/* ТУЛБАР */}
             <div className="toolbar">
               <button onClick={() => setTool('select')} className={`tool-btn ${tool==='select'?'active':''}`}><MousePointer2 size={20}/></button>
               <button onClick={() => setTool('pencil')} className={`tool-btn ${tool==='pencil'?'active':''}`}><Pencil size={20}/></button>
-              <div className="divider" />
               <button onClick={addNote} className="tool-btn"><Type size={20}/></button>
+              <button onClick={addFrame} className="tool-btn"><Layout size={20}/></button>
+
+              {/* ПАЛИТРА ЦВЕТОВ */}
+              <div className="color-picker">
+                {['#2563eb', '#ef4444', '#10b981', '#f59e0b', '#000000'].map(color => (
+                  <div 
+                    key={color} 
+                    className={`color-dot ${drawingColor === color ? 'active' : ''}`}
+                    style={{ background: color }}
+                    onClick={() => setDrawingColor(color)}
+                  />
+                ))}
+              </div>
             </div>
 
-            {/* ЗАМЕТКИ */}
+            {/* ЭЛЕМЕНТЫ (Фреймы и Заметки) */}
             {elements.map(el => (
-              <div 
-                key={el.id} 
-                onMouseDown={(e) => handleMouseDown(e, el)} 
-                style={{ left: el.x, top: el.y, cursor: tool === 'select' ? 'grab' : 'default' }} 
-                className="note"
-              >
-                <div className="note-header">
-                  <div className="note-handle" />
-                  <button onClick={() => deleteElement(el.id)} className="btn-delete"><Trash2 size={12} /></button>
+              el.type === 'frame' ? (
+                <div key={el.id} className="frame" style={{ left: el.x, top: el.y, width: el.width, height: el.height }}>
+                  <div className="frame-label">{el.content}</div>
                 </div>
-                <textarea 
-                  value={el.content} 
-                  onChange={(e) => updateNoteContent(el.id, e.target.value)} 
-                  rows={3} 
-                />
-              </div>
+              ) : (
+                <div 
+                  key={el.id} 
+                  onMouseDown={(e) => handleMouseDown(e, el)} 
+                  style={{ left: el.x, top: el.y, cursor: tool === 'select' ? 'grab' : 'default', zIndex: 10 }} 
+                  className="note"
+                >
+                  <div className="note-header">
+                    <div className="note-handle" />
+                    <button onClick={() => deleteElement(el.id)} className="btn-delete"><Trash2 size={12} /></button>
+                  </div>
+                  <textarea 
+                    value={el.content} 
+                    onChange={(e) => updateNoteContent(el.id, e.target.value)} 
+                    rows={3} 
+                  />
+                </div>
+              )
             ))}
+
+            {/* СЛОЙ ДЛЯ РИСОВАНИЯ */}
+            <canvas 
+              ref={canvasRef}
+              className={`drawing-canvas ${tool === 'pencil' ? 'active' : ''}`}
+              width={2000} 
+              height={2000} 
+              onMouseDown={startDrawing}
+              style={{ position: 'absolute', top: 0, left: 0, pointerEvents: tool === 'pencil' ? 'all' : 'none' }}
+            />
           </div>
         ) : (
           <div className="empty-state">
