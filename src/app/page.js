@@ -64,18 +64,12 @@ export default function EduCanvas() {
     }).eq('id', activeBoard.id);
   }, [activeBoard, elements, drawings, panOffset]);
 
-  // Возвращаем навигацию колесиком (Shift для горизонтали, Ctrl для зума)
+  // Зум ТОЛЬКО колесиком, без Ctrl
   const handleWheel = (e) => {
-    if (e.ctrlKey) {
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? -0.05 : 0.05;
-      setZoom(prev => Math.min(Math.max(0.1, prev + delta), 3));
-    } else {
-      setPanOffset(prev => ({
-        x: prev.x - e.deltaX,
-        y: prev.y - e.deltaY
-      }));
-    }
+    e.preventDefault();
+    const zoomSpeed = 0.001;
+    const delta = -e.deltaY * zoomSpeed;
+    setZoom(prev => Math.min(Math.max(0.1, prev + delta), 3));
   };
 
   const startDrawing = (e) => {
@@ -86,6 +80,7 @@ export default function EduCanvas() {
   };
 
   const handleMouseDown = (e, el) => {
+    // Если кликаем по пустому месту — включаем перемещение (панорамирование)
     if (e.button === 0 && !el && (tool === 'select' || tool === 'eraser')) {
       setIsPanning(true);
       setStartPanPos({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
@@ -105,17 +100,18 @@ export default function EduCanvas() {
       setPanOffset({ x: e.clientX - startPanPos.x, y: e.clientY - startPanPos.y });
       return;
     }
+    const coords = getCanvasCoords(e.clientX, e.clientY);
     if (isDrawing && currentLine) {
-      const coords = getCanvasCoords(e.clientX, e.clientY);
       setCurrentLine(prev => ({ ...prev, points: [...prev.points, coords] }));
       return;
     }
-    const coords = getCanvasCoords(e.clientX, e.clientY);
     if (resizingElement) {
       setElements(elements.map(el => el.id === resizingElement ? { 
-        ...el, width: Math.max(50, coords.x - el.x),
-        height: el.type === 'frame' ? Math.max(50, coords.y - el.y) : el.height
+        ...el, 
+        width: Math.max(100, coords.x - el.x),
+        height: el.type === 'frame' ? Math.max(100, coords.y - el.y) : el.height
       } : el));
+      return;
     }
     if (draggedElement) {
       setElements(elements.map(el => el.id === draggedElement ? { 
@@ -139,8 +135,7 @@ export default function EduCanvas() {
 
   const addText = () => {
     const coords = getCanvasCoords(window.innerWidth/2, window.innerHeight/2);
-    // Сдвигаем на половину ширины, чтобы текст вставлялся по центру курсора
-    setElements([...elements, { id: Date.now(), type: 'text', x: coords.x - 150, y: coords.y, width: 300, content: '' }]);
+    setElements([...elements, { id: Date.now(), type: 'text', x: coords.x - 150, y: coords.y - 50, width: 300, content: '' }]);
   };
 
   const addFrame = () => {
@@ -149,16 +144,15 @@ export default function EduCanvas() {
   };
 
   return (
-    <div className="app-container" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onWheel={handleWheel}>
+    <div className="app-container" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onWheel={handleWheel} style={{ touchAction: 'none' }}>
       <aside className="sidebar" style={{ width: isSidebarOpen ? '280px' : '0' }}>
         <div className="sidebar-header"><div className="logo-box">E</div>Edu Board</div>
         <div className="sidebar-content">
-          <div className="sidebar-section-title"><span>ПРОЕКТЫ</span><button onClick={() => {}}><Plus size={16}/></button></div>
+          <div className="sidebar-section-title"><span>ПРОЕКТЫ</span><button><Plus size={16}/></button></div>
           {folders.map(f => (
             <div key={f.id} className="folder-group">
               <div className="folder-item" onClick={() => setExpandedFolders({...expandedFolders, [f.id]: !expandedFolders[f.id]})}>
                 {expandedFolders[f.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                <Folder size={16} />
                 <span className="folder-name">{f.name}</span>
               </div>
               {expandedFolders[f.id] && f.boards?.map(b => (
@@ -183,6 +177,7 @@ export default function EduCanvas() {
               <button onClick={() => setTool('eraser')} className={`tool-btn ${tool==='eraser'?'active':''}`}><Eraser size={20}/></button>
               <button onClick={addText} className="tool-btn"><Type size={20}/></button>
               <button onClick={addFrame} className="tool-btn"><Layout size={20}/></button>
+              
               <div className="color-picker">
                 {['#2563eb', '#ef4444', '#10b981', '#f59e0b', '#f472b6', '#8b5cf6', '#000000'].map(color => (
                   <div key={color} className={`color-dot ${drawingColor === color ? 'active' : ''}`} style={{ background: color }} onClick={() => setDrawingColor(color)} />
@@ -192,13 +187,12 @@ export default function EduCanvas() {
 
             <div className="viewport" style={{ 
               transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`, 
-              transformOrigin: '0 0',
-              cursor: isPanning ? 'grabbing' : 'default'
+              transformOrigin: '0 0'
             }}>
               <div className="grid-layer" />
               
               <svg className="drawing-svg" onMouseDown={startDrawing} style={{ 
-                position: 'absolute', top: -5000, left: -5000, width: '20000px', height: '20000px',
+                position: 'absolute', top: -10000, left: -10000, width: '40000px', height: '40000px',
                 pointerEvents: tool === 'pencil' || tool === 'eraser' ? 'all' : 'none', 
                 zIndex: 80 
               }}>
@@ -224,19 +218,15 @@ export default function EduCanvas() {
                       <textarea 
                         className="miro-input" 
                         value={el.content} 
-                        placeholder="Текст..." 
+                        placeholder="Введите текст..." 
                         onChange={(e) => {
                           setElements(elements.map(item => item.id === el.id ? {...item, content: e.target.value} : item));
-                          // Автоматическое расширение высоты
-                          e.target.style.height = 'inherit';
-                          e.target.style.height = `${e.target.scrollHeight}px`;
-                        }}
-                        onFocus={(e) => {
                           e.target.style.height = 'inherit';
                           e.target.style.height = `${e.target.scrollHeight}px`;
                         }}
                       />
                     ) : <div className="miro-frame-header">{el.content}</div>}
+                    
                     <div className="miro-resizer" onMouseDown={(e) => { e.stopPropagation(); setResizingElement(el.id); }} />
                   </div>
                 ))}
