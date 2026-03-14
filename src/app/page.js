@@ -47,6 +47,25 @@ export default function EduCanvas() {
     if (data) setFolders(data);
   };
 
+  const addFolder = async () => {
+    if (!supabase) return;
+    const name = prompt("Название папки:");
+    if (!name) return;
+    const { data } = await supabase.from('folders').insert([{ name }]).select();
+    if (data) setFolders([...folders, { ...data[0], boards: [] }]);
+  };
+
+  const addBoard = async (folderId) => {
+    if (!supabase) return;
+    const name = prompt("Название доски:");
+    if (!name) return;
+    const { data } = await supabase.from('boards').insert([{ name, folder_id: folderId, elements: [], drawings: [] }]).select();
+    if (data) {
+      setFolders(folders.map(f => f.id === folderId ? { ...f, boards: [...f.boards, data[0]] } : f));
+      setActiveBoard(data[0]);
+    }
+  };
+
   const getCanvasCoords = (clientX, clientY) => {
     if (!canvasRef.current) return { x: 0, y: 0 };
     const rect = canvasRef.current.getBoundingClientRect();
@@ -64,32 +83,21 @@ export default function EduCanvas() {
     }).eq('id', activeBoard.id);
   }, [activeBoard, elements, drawings, panOffset]);
 
-  // Зум ТОЛЬКО колесиком, без Ctrl
   const handleWheel = (e) => {
     e.preventDefault();
-    const zoomSpeed = 0.001;
+    const zoomSpeed = 0.0015;
     const delta = -e.deltaY * zoomSpeed;
     setZoom(prev => Math.min(Math.max(0.1, prev + delta), 3));
   };
 
-  const startDrawing = (e) => {
-    if (tool !== 'pencil') return;
-    setIsDrawing(true);
-    const coords = getCanvasCoords(e.clientX, e.clientY);
-    setCurrentLine({ id: Date.now(), points: [coords], color: drawingColor });
-  };
-
   const handleMouseDown = (e, el) => {
-    // Если кликаем по пустому месту — включаем перемещение (панорамирование)
-    if (e.button === 0 && !el && (tool === 'select' || tool === 'eraser')) {
+    if (e.button === 0 && !el && tool !== 'pencil') {
       setIsPanning(true);
       setStartPanPos({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
       return;
     }
     if (tool !== 'select' || e.target.tagName === 'TEXTAREA' || !el) return;
 
-    const newElements = [...elements.filter(item => item.id !== el.id), el];
-    setElements(newElements);
     setDraggedElement(el.id);
     const coords = getCanvasCoords(e.clientX, e.clientY);
     setOffset({ x: coords.x - el.x, y: coords.y - el.y });
@@ -109,7 +117,7 @@ export default function EduCanvas() {
       setElements(elements.map(el => el.id === resizingElement ? { 
         ...el, 
         width: Math.max(100, coords.x - el.x),
-        height: el.type === 'frame' ? Math.max(100, coords.y - el.y) : el.height
+        height: Math.max(50, coords.y - el.y) // Теперь и для текста работает высота
       } : el));
       return;
     }
@@ -135,7 +143,7 @@ export default function EduCanvas() {
 
   const addText = () => {
     const coords = getCanvasCoords(window.innerWidth/2, window.innerHeight/2);
-    setElements([...elements, { id: Date.now(), type: 'text', x: coords.x - 150, y: coords.y - 50, width: 300, content: '' }]);
+    setElements([...elements, { id: Date.now(), type: 'text', x: coords.x - 150, y: coords.y - 50, width: 300, height: 150, content: '' }]);
   };
 
   const addFrame = () => {
@@ -148,12 +156,14 @@ export default function EduCanvas() {
       <aside className="sidebar" style={{ width: isSidebarOpen ? '280px' : '0' }}>
         <div className="sidebar-header"><div className="logo-box">E</div>Edu Board</div>
         <div className="sidebar-content">
-          <div className="sidebar-section-title"><span>ПРОЕКТЫ</span><button><Plus size={16}/></button></div>
+          <div className="sidebar-section-title"><span>МОИ ПАПКИ</span><button onClick={addFolder} className="add-btn"><Plus size={16}/></button></div>
           {folders.map(f => (
             <div key={f.id} className="folder-group">
               <div className="folder-item" onClick={() => setExpandedFolders({...expandedFolders, [f.id]: !expandedFolders[f.id]})}>
                 {expandedFolders[f.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                <Folder size={16} className="folder-icon" />
                 <span className="folder-name">{f.name}</span>
+                <button onClick={(e) => { e.stopPropagation(); addBoard(f.id); }} className="add-board-mini"><Plus size={12}/></button>
               </div>
               {expandedFolders[f.id] && f.boards?.map(b => (
                 <div key={b.id} onClick={() => setActiveBoard(b)} className={`board-item ${activeBoard?.id === b.id ? 'active' : ''}`}>{b.name}</div>
@@ -177,66 +187,35 @@ export default function EduCanvas() {
               <button onClick={() => setTool('eraser')} className={`tool-btn ${tool==='eraser'?'active':''}`}><Eraser size={20}/></button>
               <button onClick={addText} className="tool-btn"><Type size={20}/></button>
               <button onClick={addFrame} className="tool-btn"><Layout size={20}/></button>
-              
               <div className="color-picker">
-                {['#2563eb', '#ef4444', '#10b981', '#f59e0b', '#f472b6', '#8b5cf6', '#000000'].map(color => (
+                {['#2563eb', '#ef4444', '#10b981', '#f59e0b', '#000000'].map(color => (
                   <div key={color} className={`color-dot ${drawingColor === color ? 'active' : ''}`} style={{ background: color }} onClick={() => setDrawingColor(color)} />
                 ))}
               </div>
             </div>
 
-            <div className="viewport" style={{ 
-              transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`, 
-              transformOrigin: '0 0'
-            }}>
+            <div className="viewport" style={{ transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`, transformOrigin: '0 0' }}>
               <div className="grid-layer" />
-              
-              <svg className="drawing-svg" onMouseDown={startDrawing} style={{ 
-                position: 'absolute', top: -10000, left: -10000, width: '40000px', height: '40000px',
-                pointerEvents: tool === 'pencil' || tool === 'eraser' ? 'all' : 'none', 
-                zIndex: 80 
-              }}>
+              <svg className="drawing-svg" onMouseDown={(e) => tool === 'pencil' && setIsDrawing(true)} style={{ position: 'absolute', top: -10000, left: -10000, width: '40000px', height: '40000px', pointerEvents: tool === 'pencil' || tool === 'eraser' ? 'all' : 'none', zIndex: 80 }}>
                 {drawings.map(line => (
-                  <path key={line.id} d={`M ${line.points.map(p => `${p.x} ${p.y}`).join(' L ')}`} fill="none" stroke={line.color} strokeWidth="3" strokeLinecap="round" 
-                    style={{ pointerEvents: tool === 'eraser' ? 'stroke' : 'none' }}
-                    onMouseEnter={() => tool === 'eraser' && setDrawings(prev => prev.filter(l => l.id !== line.id))}
-                  />
+                  <path key={line.id} d={`M ${line.points.map(p => `${p.x} ${p.y}`).join(' L ')}`} fill="none" stroke={line.color} strokeWidth="3" strokeLinecap="round" onMouseEnter={() => tool === 'eraser' && setDrawings(prev => prev.filter(l => l.id !== line.id))} style={{ pointerEvents: tool === 'eraser' ? 'stroke' : 'none' }} />
                 ))}
                 {currentLine && <path d={`M ${currentLine.points.map(p => `${p.x} ${p.y}`).join(' L ')}`} fill="none" stroke={currentLine.color} strokeWidth="3" strokeLinecap="round" />}
               </svg>
 
               <div className="elements-layer">
                 {elements.map(el => (
-                  <div key={el.id} onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, el); }}
-                    className={el.type === 'frame' ? 'miro-frame' : 'miro-text-block'}
-                    style={{ left: el.x, top: el.y, width: el.width, height: el.type === 'frame' ? el.height : 'auto', position: 'absolute', zIndex: el.type === 'text' ? 100 : 50 }}
-                  >
-                    <div className="element-controls">
-                      <button onClick={(e) => { e.stopPropagation(); setElements(elements.filter(i => i.id !== el.id)); saveToDatabase(elements.filter(i => i.id !== el.id)); }} className="del-btn"><Trash2 size={12}/></button>
-                    </div>
+                  <div key={el.id} onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, el); }} className={el.type === 'frame' ? 'miro-frame' : 'miro-text-block'} style={{ left: el.x, top: el.y, width: el.width, height: el.height, position: 'absolute' }}>
+                    <div className="element-controls"><button onClick={(e) => { e.stopPropagation(); setElements(elements.filter(i => i.id !== el.id)); }} className="del-btn"><Trash2 size={12}/></button></div>
                     {el.type === 'text' ? (
-                      <textarea 
-                        className="miro-input" 
-                        value={el.content} 
-                        placeholder="Введите текст..." 
-                        onChange={(e) => {
-                          setElements(elements.map(item => item.id === el.id ? {...item, content: e.target.value} : item));
-                          e.target.style.height = 'inherit';
-                          e.target.style.height = `${e.target.scrollHeight}px`;
-                        }}
-                      />
+                      <textarea className="miro-input" style={{ height: '100%' }} value={el.content} onChange={(e) => setElements(elements.map(item => item.id === el.id ? {...item, content: e.target.value} : item))} placeholder="Текст..." />
                     ) : <div className="miro-frame-header">{el.content}</div>}
-                    
                     <div className="miro-resizer" onMouseDown={(e) => { e.stopPropagation(); setResizingElement(el.id); }} />
                   </div>
                 ))}
               </div>
             </div>
-
-            <div className="zoom-controls">
-              <button onClick={() => { setPanOffset({x:0,y:0}); setZoom(1); }} className="tool-btn"><Home size={18}/></button>
-              <span className="zoom-val">{Math.round(zoom * 100)}%</span>
-            </div>
+            <div className="zoom-controls"><button onClick={() => { setPanOffset({x:0,y:0}); setZoom(1); }} className="tool-btn"><Home size={18}/></button><span className="zoom-val">{Math.round(zoom * 100)}%</span></div>
           </div>
         )}
       </main>
