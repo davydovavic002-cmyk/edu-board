@@ -1,59 +1,54 @@
 body { margin: 0; font-family: 'Inter', sans-serif; background: #f8fafc; overflow: hidden; }
-.app-container { display: flex; height: 100vh; position: relative; }
+.app-container { display: flex; height: 100vh; position: relative; width: 100vw; }
 
-/* Sidebar fixes */
 .sidebar { 
     background: white; border-right: 1px solid #e2e8f0; 
     z-index: 1000; transition: width 0.3s; 
-    overflow: hidden; position: relative;
+    overflow: hidden; flex-shrink: 0;
 }
 .sidebar-header { padding: 24px; border-bottom: 1px solid #f1f5f9; font-weight: 800; display: flex; align-items: center; gap: 10px; white-space: nowrap; }
 .logo-box { width: 32px; height: 32px; background: #2563eb; border-radius: 8px; color: white; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .sidebar-content { padding: 20px; overflow-y: auto; height: calc(100% - 80px); }
 
-.main-content { flex: 1; display: flex; flex-direction: column; position: relative; z-index: 1; overflow: hidden; }
+.main-content { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
 .header { 
     height: 60px; background: white; border-bottom: 1px solid #e2e8f0; 
-    display: flex; align-items: center; padding: 0 24px; z-index: 500; gap: 15px; 
+    display: flex; align-items: center; padding: 0 24px; z-index: 500; gap: 15px; flex-shrink: 0;
 }
 .btn-toggle { background: transparent; border: none; cursor: pointer; color: #64748b; z-index: 1100; }
 
-.canvas-area { flex: 1; position: relative; overflow: hidden; background: #f8fafc; cursor: default; }
-.viewport { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+.canvas-area { flex: 1; position: relative; overflow: hidden; background: #f3f4f6; cursor: default; }
+.viewport { position: absolute; top: 0; left: 0; width: 100%; height: 100%; will-change: transform; }
 
 .grid-layer {
-    position: absolute; inset: 0; width: 10000px; height: 10000px;
+    position: absolute; inset: -5000px; width: 20000px; height: 20000px;
     background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
-    background-size: 30px 30px;
+    background-size: 40px 40px;
     z-index: 0;
 }
 
-.toolbar { position: absolute; left: 20px; top: 50%; transform: translateY(-50%); background: white; padding: 8px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.08); display: flex; flex-direction: column; gap: 6px; z-index: 1000; border: 1px solid #e2e8f0; }
+/* Тулбар теперь зафиксирован относительно экрана, чтобы не уезжать */
+.toolbar { 
+    position: fixed; left: 300px; top: 50%; transform: translateY(-50%); 
+    background: white; padding: 8px; border-radius: 12px; 
+    box-shadow: 0 8px 30px rgba(0,0,0,0.1); display: flex; flex-direction: column; 
+    gap: 6px; z-index: 1000; border: 1px solid #e2e8f0;
+    transition: left 0.3s;
+}
+/* Если сайдбар закрыт, тулбар прижимается к левому краю */
+.sidebar[style*="width: 0"] + .main-content .toolbar { left: 20px; }
+
 .tool-btn { width: 38px; height: 38px; border-radius: 8px; border: none; background: transparent; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .tool-btn.active { background: #2563eb; color: white; }
 
-.color-picker { display: flex; flex-direction: column; gap: 8px; padding: 8px 0; align-items: center; border-top: 1px solid #f1f5f9; margin-top: 4px; }
-.color-dot { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid white; box-shadow: 0 0 0 1px #e2e8f0; }
-.color-dot.active { box-shadow: 0 0 0 2px #2563eb; }
-
-/* Elements */
-.miro-text-block { background: white; padding: 12px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1px solid transparent; }
+.miro-text-block { background: white; padding: 12px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 2px solid transparent; min-width: 150px; }
 .miro-text-block:hover { border-color: #2563eb; }
-.miro-input { width: 100%; min-height: 40px; background: transparent; border: none; outline: none; font-size: 16px; resize: none; overflow: hidden; }
+.miro-input { 
+    width: 100%; min-height: 24px; background: transparent; border: none; outline: none; 
+    font-size: 15px; color: #1e293b; resize: none; overflow: hidden; line-height: 1.5;
+}
 
-.miro-frame { border: 2px solid #cbd5e1; border-radius: 12px; background: rgba(255, 255, 255, 0.4); pointer-events: all; }
-.miro-frame-header { position: absolute; top: -30px; left: 0; font-size: 12px; font-weight: 800; color: #94a3b8; background: #f1f5f9; padding: 4px 12px; border-radius: 6px; }
+.miro-frame { border: 2px solid #3b82f6; border-radius: 12px; background: rgba(255, 255, 255, 0.2); pointer-events: all; }
+.miro-frame-header { position: absolute; top: -32px; left: 0; font-size: 12px; font-weight: 800; color: #2563eb; background: #dbeafe; padding: 4px 12px; border-radius: 6px; }
 
-.element-controls { position: absolute; top: -35px; right: 0; display: none; }
-.miro-text-block:hover .element-controls, .miro-frame:hover .element-controls { display: flex; }
-.del-btn { background: #ef4444; color: white; border: none; padding: 4px; border-radius: 4px; cursor: pointer; }
-
-.miro-resizer { width: 12px; height: 12px; background: #2563eb; position: absolute; right: -6px; bottom: -6px; border-radius: 50%; cursor: nwse-resize; z-index: 10; }
-
-.zoom-controls { position: absolute; bottom: 20px; right: 20px; background: white; padding: 4px 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); z-index: 1000; border: 1px solid #e2e8f0; }
-.zoom-val { font-size: 12px; font-weight: 700; color: #64748b; width: 40px; text-align: center; }
-
-/* Sidebar items */
-.folder-item { display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 14px; color: #1e293b; }
-.board-item { margin-left: 28px; padding: 8px 12px; font-size: 13px; border-radius: 8px; cursor: pointer; color: #64748b; }
-.board-item.active { background: #2563eb; color: white; }
+.zoom-controls { position: fixed; bottom: 20px; right: 20px; background: white; padding: 8px 16px; border-radius: 12px; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); z-index: 1000; border: 1px solid #e2e8f0; }
