@@ -47,7 +47,6 @@ export default function EduCanvas() {
     if (data) setFolders(data);
   };
 
-  // Вспомогательная функция для точных координат на холсте
   const getCanvasCoords = (clientX, clientY) => {
     if (!canvasRef.current) return { x: 0, y: 0 };
     const rect = canvasRef.current.getBoundingClientRect();
@@ -65,11 +64,17 @@ export default function EduCanvas() {
     }).eq('id', activeBoard.id);
   }, [activeBoard, elements, drawings, panOffset]);
 
+  // Возвращаем навигацию колесиком (Shift для горизонтали, Ctrl для зума)
   const handleWheel = (e) => {
     if (e.ctrlKey) {
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.05 : 0.05;
       setZoom(prev => Math.min(Math.max(0.1, prev + delta), 3));
+    } else {
+      setPanOffset(prev => ({
+        x: prev.x - e.deltaX,
+        y: prev.y - e.deltaY
+      }));
     }
   };
 
@@ -134,7 +139,8 @@ export default function EduCanvas() {
 
   const addText = () => {
     const coords = getCanvasCoords(window.innerWidth/2, window.innerHeight/2);
-    setElements([...elements, { id: Date.now(), type: 'text', x: coords.x, y: coords.y, width: 250, content: '' }]);
+    // Сдвигаем на половину ширины, чтобы текст вставлялся по центру курсора
+    setElements([...elements, { id: Date.now(), type: 'text', x: coords.x - 150, y: coords.y, width: 300, content: '' }]);
   };
 
   const addFrame = () => {
@@ -192,7 +198,7 @@ export default function EduCanvas() {
               <div className="grid-layer" />
               
               <svg className="drawing-svg" onMouseDown={startDrawing} style={{ 
-                position: 'absolute', top: 0, left: 0, width: '10000px', height: '10000px',
+                position: 'absolute', top: -5000, left: -5000, width: '20000px', height: '20000px',
                 pointerEvents: tool === 'pencil' || tool === 'eraser' ? 'all' : 'none', 
                 zIndex: 80 
               }}>
@@ -215,8 +221,20 @@ export default function EduCanvas() {
                       <button onClick={(e) => { e.stopPropagation(); setElements(elements.filter(i => i.id !== el.id)); saveToDatabase(elements.filter(i => i.id !== el.id)); }} className="del-btn"><Trash2 size={12}/></button>
                     </div>
                     {el.type === 'text' ? (
-                      <textarea className="miro-input" value={el.content} placeholder="Текст..." 
-                        onChange={(e) => setElements(elements.map(item => item.id === el.id ? {...item, content: e.target.value} : item))}
+                      <textarea 
+                        className="miro-input" 
+                        value={el.content} 
+                        placeholder="Текст..." 
+                        onChange={(e) => {
+                          setElements(elements.map(item => item.id === el.id ? {...item, content: e.target.value} : item));
+                          // Автоматическое расширение высоты
+                          e.target.style.height = 'inherit';
+                          e.target.style.height = `${e.target.scrollHeight}px`;
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.height = 'inherit';
+                          e.target.style.height = `${e.target.scrollHeight}px`;
+                        }}
                       />
                     ) : <div className="miro-frame-header">{el.content}</div>}
                     <div className="miro-resizer" onMouseDown={(e) => { e.stopPropagation(); setResizingElement(el.id); }} />
